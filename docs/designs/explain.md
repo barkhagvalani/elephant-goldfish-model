@@ -76,7 +76,8 @@ sequenceDiagram
     Skill->>Tree: Write repository explainer and glossary
     Skill->>Tree: Add pointer under each README H1, then fill hashes
     Skill->>Readers: Fact-check (explainer + sources), then plain-language (explainer only)
-    Readers->>Tree: Apply supported fixes
+    Readers-->>Skill: Return findings without modifying files
+    Skill->>Tree: Apply source-supported fixes
     Skill->>Human: Report written, folded, gaps, kept-as-is findings
 ```
 
@@ -91,7 +92,7 @@ reports.
 | `path` | required | Repository root or subtree. |
 | `scope` | `all` | `all`, `repo` (root only) or `package` (one directory). |
 | `audience` | `internal` | `shareable` leaves out hosts, internal emails, account names and ticket numbers. |
-| `refresh` | `false` | Rewrite only explainers whose contract hash changed, plus ancestors. |
+| `refresh` | `false` | Rewrite explainers whose source or output-configuration fingerprint changed, plus ancestors. |
 | `target_filename` | `EXPLAINER.md` | Output name. |
 | `contract_filename` | `README.md` | Use `EGM.md` for trees bootstrapped with that name. |
 | `extra_sources` | none | Human-maintained documents the repository explainer may cite, such as a runbook. |
@@ -136,15 +137,25 @@ Each explainer ends with
 contract. Hashing first would make every explainer look stale on the next
 refresh, which the trial run caught.
 
+The contract hash alone is not a sufficient refresh key. Record a deterministic
+fingerprint covering the contract content, child explainer content, named extra
+source content, and effective output settings (`audience`, filenames, scope,
+and template version). Added, removed, or changed dependencies invalidate the
+explainer and its ancestors. A changed audience must invalidate an existing
+internal explainer before producing a shareable result. Missing dependencies
+or an incomplete fingerprint require regeneration rather than a fresh result.
+
 ### Goldfish Review
 
-1.  **Fact check** (general reviewer, explainer plus its sources): reports and
-    fixes any claim, number, node or arrow the sources do not support, and any
+1.  **Fact check** (general reviewer, explainer plus its sources): reports
+    any claim, number, node or arrow the sources do not support, and any
     shareable-mode leak.
 2.  **Plain-language reader** (`egm-comprehension`, explainer only): reports
     what it could not follow.
 
-Fact fixes land first. A reader's suggested rewrite often guesses at facts it
+Both reviewers are read-only Goldfish agents. They return findings to the
+coordinator, which applies source-supported fixes. Fact fixes land first.
+A reader's suggested rewrite often guesses at facts it
 cannot see, so each one is checked against the sources before it is applied;
 rewrites that would need a missing fact are reported as "kept as is" and added
 to the gaps.
@@ -198,7 +209,7 @@ every linked term, batched subagents, and gaps grouped by contract.
 | `skills/egm-explain/SKILL.md` | Skill Definition | Implements `/egm-explain`: discovery, folding, batched writers, diagrams, glossary, linking, hashing, review and verification. |
 | `skills/egm-explain/references/templates.md` | Templates | Package and repository explainer outlines. |
 | `skills/egm-explain/TEST.md` | Test Plan | Points to `pytest tests/unit` and lists six manual scenarios. |
-| `skills/egm-explain/test_scenarios.yaml` | Evaluation Scenarios | Five scenarios: no contracts, diagram from contract nodes, pass-through fold, hash after pointer, shareable redaction. |
+| `skills/egm-explain/test_scenarios.yaml` | Evaluation Scenarios | No contracts, diagram grounding, pass-through fold, hash after pointer, shareable redaction, refresh after child or extra-source changes, audience changes, and read-only reviewer findings. |
 | `skills/egm-explain/assets/icon.svg` | Icon | Speech bubble in the create palette (`#1b6ef3` / `#7cacf8`). |
 | `skills/egm-explain/agents/openai.yaml` | Host Metadata | Display name, description and icon for OpenAI hosts. |
 
